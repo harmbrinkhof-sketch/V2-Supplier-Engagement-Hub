@@ -1,0 +1,29 @@
+# Netlify configuration — The Corporate Supplier Sustainability Portal 2026
+# Tier 1: static site, no build step, no backend. Auto-deploys from main.
+
+[build]
+  # The site is plain HTML/CSS/JS served from the repository root.
+  publish = "."
+
+# The single page loads all views client-side, so no SPA redirects are needed.
+# Static assets (workbook, PDFs) live under /public/assets/ and vendored JS under
+# /public/vendor/ — both resolve at their literal paths from the publish root.
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    X-Frame-Options = "SAMEORIGIN"
+    Permissions-Policy = "geolocation=(), microphone=(), camera=()"
+
+# Long-cache the static assets (content-addressed by filename/version).
+[[headers]]
+  for = "/public/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=86400"
+
+[[headers]]
+  for = "/public/vendor/*"
+  [headers.values]
+    Cache-Control = "public, max-age=604800"
