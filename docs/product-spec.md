@@ -1,6 +1,6 @@
 # Product Spec — The Corporate Supplier Sustainability Portal 2026
 
-**Version:** 3.1
+**Version:** 3.2
 **Date:** 15 September 2026
 **Author:** Harm
 **Status:** Confirmed
@@ -11,13 +11,13 @@
 
 **Tool name:** The Corporate Supplier Sustainability Portal 2026
 
-**What it does:** A public landing page that onboards Tier 1 suppliers into The Corporate's ESRS-aligned sustainability assessment programme and routes each supplier to the correct submission path — an EcoVadis scorecard, or the ESRS-aligned questionnaire completed and submitted directly inside the tool. Submissions are now written to a database so The Corporate can retain and review them, and each door opens with a company/contact capture step before any questionnaire content.
+**What it does:** A public landing page that onboards Tier 1 suppliers into The Corporate's ESRS-aligned sustainability assessment programme and routes each supplier to the correct submission path — an EcoVadis scorecard, or the ESRS-aligned questionnaire completed and submitted directly inside the tool. Submissions are now written to a database so The Corporate can retain and review them. All three paths — EcoVadis, Door 1, and Door 2 — now open with a company/contact capture step (including a new EcoVadis Scorecard Link field on the EcoVadis path) before anything else happens.
 
 **Who uses it:** Tier 1 supplier contacts — sustainability managers, EHS leads, and procurement representatives at supplier organisations — who receive the URL directly from The Corporate's procurement or EHS team.
 
-**Why it exists:** To formally launch The Corporate's 2026 supplier sustainability assessment without requiring direct explanation from the internal team, to let suppliers submit the questionnaire through the portal itself instead of an email exchange, and — as of this version — to let The Corporate actually retain what suppliers submit instead of it disappearing when the tab closes.
+**Why it exists:** To formally launch The Corporate's 2026 supplier sustainability assessment without requiring direct explanation from the internal team, to let suppliers submit the questionnaire through the portal itself instead of an email exchange, and — as of this version — to let The Corporate actually retain what suppliers submit, across all three submission paths, instead of it disappearing when the tab closes (or, for EcoVadis, not being captured at all).
 
-**Build status:** Iteration — previous version (v2.0) offered two in-tool submission doors (a guided form and a download/upload flow) but data was session-only and lost on tab close. This build adds a database so submissions persist, and adds a company/contact capture step as the first step of each door.
+**Build status:** Iteration — v2.0 offered two in-tool submission doors (a guided form and a download/upload flow) but data was session-only and lost on tab close; the EcoVadis path was a plain outbound link with no data capture. v3.0/v3.1 added a database, Contact Step, and Declaration step to Door 1 and Door 2. This version (v3.2) extends contact capture to the EcoVadis path as well — it is no longer a bare link, but its own short intake form that saves to the database before redirecting to EcoVadis.
 
 ---
 
@@ -111,9 +111,9 @@ Arms are capabilities added to the tool. They do not change the tier.
 
 | Detail | Answer |
 |--------|--------|
-| Trigger event | Supplier clicks Submit on either door's Review screen |
-| Recipient | The supplier's own contact email, as captured in that door's Contact Step |
-| Email content | Short confirmation only — "We've received your submission." No summary of submitted answers, no attachment. |
+| Trigger event | Supplier clicks Submit on either door's Review screen, or Submit on the EcoVadis intake form |
+| Recipient | The supplier's own contact email, as captured in that path's Contact Step |
+| Email content | Short confirmation only — "We've received your submission." No summary of submitted answers, no attachment. Same content on all three paths. |
 | File attachment in transit | No |
 | Function placement | Netlify Function — user-triggered |
 
@@ -173,17 +173,33 @@ The builder creates or reuses the existing GitHub repo before the Claude Code se
 | contact_email | Contact email | Text | Supplier — Contact Step | Yes |
 | contact_phone | Contact phone | Text | Supplier — Contact Step | Yes |
 | contact_job_title | Job title / role | Text | Supplier — Contact Step | Yes |
+| department | Department | Text | Supplier — Contact Step | Yes |
 | submission_door | Which door was used | Text (Door 1 / Door 2) | Automatic — set by which flow the supplier completed | Yes |
 | questionnaire_answers | S2–S7 questionnaire answers | Structured (JSON, keyed to the same field IDs already extracted from the workbook for the front-end field model) | Supplier — via Door 1 stepper or Door 2 upload/parse | Answers are optional per the workbook's own required/conditional rules (unchanged from v2.0); the Contact Step and Declaration fields are the only fields required to proceed |
 | authorised_signatory_name | Authorised signatory name | Text | Supplier — Declaration step, final step before Submit on both doors | Yes |
 | declaration_confirmed | Declaration acknowledged | Boolean | Supplier — Declaration step checkbox, tied to the workbook's declaration statement ("I confirm that the information provided in this assessment is accurate and complete...") | Yes — must be `true` to submit |
 | created_at | Submission timestamp | Timestamp | Automatic | Yes — also serves as the Declaration's "Date," which is not collected as a separate field to avoid it drifting from the actual submission time |
 
+**EcoVadis path — separate field set (own table, see below):**
+
+| Field name | Plain language label | Data type | Who provides it | Required? |
+|-----------|---------------------|-----------|----------------|-----------|
+| tracking_id | Internal tracking ID | Text | Automatic — same format and sequence as the `submissions` table, for consistent tracking across all three paths | Yes |
+| company_name | Company name | Text | Supplier — EcoVadis intake form | Yes |
+| contact_name | Contact full name | Text | Supplier — EcoVadis intake form | Yes |
+| contact_email | Contact email | Text | Supplier — EcoVadis intake form | Yes |
+| contact_phone | Contact phone | Text | Supplier — EcoVadis intake form | Yes |
+| contact_job_title | Job title | Text | Supplier — EcoVadis intake form | Yes |
+| department | Department | Text | Supplier — EcoVadis intake form | Yes |
+| ecovadis_link | EcoVadis Scorecard link | Text (URL) | Supplier — EcoVadis intake form | Yes |
+| created_at | Submission timestamp | Timestamp | Automatic | Yes |
+
 **Tables needed:**
 
 | Table name | What it stores | Key fields |
 |-----------|---------------|-----------|
-| submissions | One row per supplier submission, contact details plus questionnaire answers | tracking_id, company_name, contact_email, submission_door, questionnaire_answers, created_at |
+| submissions | One row per Door 1/Door 2 submission, contact details plus questionnaire and declaration answers | tracking_id, company_name, contact_email, submission_door, questionnaire_answers, declaration_confirmed, created_at |
+| ecovadis_submissions | One row per EcoVadis-path submission, contact details plus the scorecard link — no questionnaire or declaration data | tracking_id, company_name, contact_email, ecovadis_link, created_at |
 
 **File storage:** No — unchanged from v2.0. The Door 2 upload is still parsed client-side in the browser; only the parsed answers are written to the database, and the uploaded file itself is not stored.
 
@@ -201,42 +217,53 @@ The builder creates or reuses the existing GitHub repo before the Claude Code se
 |-------|----------|----------|------------|------------|------------|
 | submissions | Unauthenticated (anon) | No | Yes | No | No |
 | submissions | Service role | All rows | Yes | Yes | Yes |
+| ecovadis_submissions | Unauthenticated (anon) | No | Yes | No | No |
+| ecovadis_submissions | Service role | All rows | Yes | Yes | Yes |
 
-The anon key (used by the public portal) may only insert new submission rows — it must never be able to read, update, or delete any row, including the row it just inserted. This prevents one supplier from ever seeing another supplier's data through the public site, and keeps the schema clean for a future login-gated review role (Section 12) to be added as an additional RLS row later, without restructuring the table.
+The anon key (used by the public portal) may only insert new rows into either table — it must never be able to read, update, or delete any row, including the row it just inserted. This prevents one supplier from ever seeing another supplier's data through the public site, and keeps the schema clean for a future login-gated review role (Section 12) to be added as an additional RLS row later, without restructuring either table.
 
 ---
 
 ## Section 7 — GDPR
 
-**GDPR outcome:** Applies — personal data is collected through the Contact Step on both doors.
+**GDPR outcome:** Applies — personal data is collected through the Contact Step on all three paths (Door 1, Door 2, and the EcoVadis intake form).
 
 **Personal data collected:**
-Company name, contact name, contact email, contact phone, job title.
+Company name, contact name, contact email, contact phone, job title, department.
 
-**Consent checkpoint on the form:** Yes — a checkbox and the data statement below must appear on the Contact Step before the supplier can proceed, on both doors.
+**Consent checkpoint on the form:** Yes — a checkbox and the data statement below must appear before the supplier can proceed, on all three paths.
 
-**Data statement text shown to users at the point of collection:**
-> "Your data will be stored securely and used only to process your sustainability assessment submission. You can request deletion at any time by contacting sustainability@thecorporate.com."
+**Data statement text shown to users at the point of collection (verbatim, identical wording on all three paths):**
+> "Your data will be stored securely and used only to process and review your company's sustainability assessment submission for The Corporate's supplier program. You can request deletion at any time by contacting sustainability@thecorporate.com."
+
+**Consent checkbox label (verbatim, identical wording on all three paths):**
+> "I have read the statement above and consent to The Corporate storing and processing these details."
 
 **Deletion mechanism:**
-A supplier contacts sustainability@thecorporate.com to request deletion. The Corporate's team processes the request manually by removing the corresponding row from the `submissions` table in the Supabase dashboard. No self-service deletion flow exists in this version.
+A supplier contacts sustainability@thecorporate.com to request deletion. The Corporate's team processes the request manually by removing the corresponding row from the `submissions` or `ecovadis_submissions` table in the Supabase dashboard. No self-service deletion flow exists in this version.
 
 ---
 
 ## Section 8 — Screen and UI Structure
 
 ### Landing Page
-- **Purpose:** Unchanged from v2.0 — routes suppliers to EcoVadis submission or the questionnaire.
-- **What is visible / user actions / what happens next:** Unchanged. "Submit EcoVadis Scorecard" opens https://ecovadis.com in a new tab. "Start Questionnaire" leads to the Door Picker.
+- **Purpose:** Routes suppliers to the EcoVadis path or the questionnaire.
+- **What is visible / user actions / what happens next:** "Start Questionnaire" leads to the Door Picker, unchanged. **Change from v2.0:** "Submit EcoVadis Scorecard" no longer opens https://ecovadis.com directly — it now leads to the new EcoVadis Contact & Scorecard step below.
 
 ### Door Picker
 - **Purpose:** Unchanged from v2.0 — lets the supplier choose Door 1 (fill in the tool) or Door 2 (download and upload).
 - **What is visible / user actions / what happens next:** Unchanged, plus a back link to the landing page.
 
+### EcoVadis Path — Contact & Scorecard Capture (new)
+- **Purpose:** Capture who the submission is from and their scorecard link before redirecting to EcoVadis, so The Corporate has a record of every supplier who claims EcoVadis coverage — this data previously wasn't captured at all.
+- **What is visible:** Intro copy: "We need your company and contact details, and a link to your current EcoVadis Scorecard, before we send you across to EcoVadis. This takes about two minutes." Fields: Company Name, Contact Full Name, Contact Email, Contact Phone, Job Title, Department (all required) — same field set as Door 1/Door 2's Contact Step, plus one additional required field, EcoVadis Scorecard Link (URL, with helper text "Paste the full URL of your current scorecard, issued within the last 12 months."). The GDPR data statement and consent checkbox (Section 7 wording, verbatim) appear below the fields. A Submit button.
+- **User actions:** Fill in all six contact fields plus the scorecard link, and check the consent box.
+- **What happens next:** Submit is disabled until every field is filled and the consent box is checked. On Submit, the record (contact fields + ecovadis_link + auto-generated tracking_id) is written to the `ecovadis_submissions` table, the confirmation email is sent to contact_email, and the browser is redirected immediately to https://ecovadis.com in a new tab. No confirmation screen is shown on the portal itself before the redirect.
+
 ### Door 1 — Contact Step (new)
 - **Purpose:** Capture who the submission is from before any questionnaire content is shown.
-- **What is visible:** Fields for company name, contact name, contact email, contact phone, job title; the GDPR consent checkbox and data statement text (Section 7); a Continue button.
-- **User actions:** Fill in all five fields (all required) and check the consent box.
+- **What is visible:** Fields for company name, contact name, contact email, contact phone, job title, department; the GDPR consent checkbox and data statement text (Section 7, verbatim wording); a Continue button.
+- **User actions:** Fill in all six fields (all required) and check the consent box.
 - **What happens next:** Continue is disabled until all fields are filled and the consent box is checked. On Continue, the supplier proceeds to the S2–S7 stepper. These contact values are held in memory and attached to the submission on final Submit.
 
 ### Door 1 — S2–S7 Stepper
@@ -252,7 +279,7 @@ A supplier contacts sustainability@thecorporate.com to request deletion. The Cor
 
 ### Door 1 — Review
 - **Purpose:** Unchanged from v2.0 — grouped read-only display of all answers, with per-section Edit.
-- **What is visible:** Now also displays the Contact Step details (company, contact name, email, phone, job title) and the Declaration details (signatory name, declaration checkbox state) as read-only summary blocks above the questionnaire sections; no Edit is offered on either block (the supplier restarts the door to change it, consistent with v2.0's no-going-back-past-doors behaviour).
+- **What is visible:** Now also displays the Contact Step details (company, contact name, email, phone, job title, department) and the Declaration details (signatory name, declaration checkbox state) as read-only summary blocks above the questionnaire sections; no Edit is offered on either block (the supplier restarts the door to change it, consistent with v2.0's no-going-back-past-doors behaviour).
 - **User actions / what happens next:** Submit writes the full record (contact fields + declaration fields + questionnaire answers + auto-generated tracking_id + submission_door = "Door 1") to the `submissions` table, sends the confirmation email to contact_email, then proceeds to Confirmation.
 
 ### Door 2 — Contact Step (new)
@@ -286,13 +313,13 @@ A supplier contacts sustainability@thecorporate.com to request deletion. The Cor
 
 **Inputs:** None from the supplier — generated automatically on submit.
 
-**Formula or rules:** `tracking_id` = `TCS-` + current calendar year + `-` + zero-padded 4-digit sequential number, incrementing per submission within that year (e.g. `TCS-2026-0001`, `TCS-2026-0002`). No deduplication or company-matching logic — every submission receives a new ID regardless of whether the same company has submitted before.
+**Formula or rules:** `tracking_id` = `TCS-` + current calendar year + `-` + zero-padded 4-digit sequential number, incrementing per submission within that year (e.g. `TCS-2026-0001`, `TCS-2026-0002`). The sequence is shared across `submissions` and `ecovadis_submissions` — one continuous count of every submission The Corporate receives regardless of path — not a separate sequence per table. No deduplication or company-matching logic — every submission receives a new ID regardless of whether the same company has submitted before.
 
-**Output:** A unique tracking_id string stored with each row in `submissions`.
+**Output:** A unique tracking_id string stored with each row, in either `submissions` or `ecovadis_submissions`.
 
-**Edge cases:** If two submissions arrive concurrently, the sequence must not produce duplicate IDs — Claude Code should implement this as a database-level sequence or equivalent atomic increment, not a client-side counter.
+**Edge cases:** If two submissions arrive concurrently — including one on each table at once — the shared sequence must not produce duplicate IDs. Claude Code should implement this as a single database-level sequence (or equivalent atomic increment) that both tables draw from, not a client-side counter and not two independent per-table sequences.
 
-**Submission gating rule (both doors):** Submit must remain disabled unless all of the following are true — every Contact Step field filled, GDPR consent checkbox checked, Authorised Signatory Name filled, and the Declaration checkbox checked. This is enforced client-side for UX and should also be enforced at the database level via a `CHECK (declaration_confirmed = true)` constraint on the `submissions` table, so a row can never be inserted without it even if the frontend check is bypassed.
+**Submission gating rule (all three paths):** Submit must remain disabled unless all of the following are true — every Contact Step field filled (including department), GDPR consent checkbox checked, and, for Door 1/Door 2 only, Authorised Signatory Name filled and the Declaration checkbox checked. This is enforced client-side for UX and should also be enforced at the database level via a `CHECK (declaration_confirmed = true)` constraint on the `submissions` table, so a row can never be inserted without it even if the frontend check is bypassed. `ecovadis_submissions` has no declaration field and needs no equivalent constraint.
 
 ---
 
@@ -351,22 +378,23 @@ A supplier contacts sustainability@thecorporate.com to request deletion. The Cor
 
 | # | What to verify | Expected result | Done? |
 |---|---------------|-----------------|-------|
-| 1 | Landing page and Door Picker render unchanged | Behaviour matches v2.0 exactly | [ ] |
-| 2 | Door 1 Contact Step blocks progress until all fields are filled and consent is checked | Continue button stays disabled until company name, contact name, email, phone, job title, and the consent checkbox are all complete | [ ] |
+| 1 | Landing page and Door Picker render, EcoVadis link now routes to the new intake step | "Start Questionnaire" leads to Door Picker unchanged; "Submit EcoVadis Scorecard" leads to the EcoVadis Contact & Scorecard step, not directly to ecovadis.com | [ ] |
+| 2 | Door 1 Contact Step blocks progress until all fields are filled and consent is checked | Continue button stays disabled until company name, contact name, email, phone, job title, department, and the consent checkbox are all complete | [ ] |
 | 3 | Door 2 Contact Step behaves identically to Door 1's, and sits before the download button | Same validation; Download button only reachable after Continue on the Contact Step | [ ] |
 | 4 | Submitting via Door 1 writes a complete row to Supabase | `submissions` table gets a new row with tracking_id, all contact fields, submission_door = "Door 1", questionnaire_answers, and created_at | [ ] |
 | 5 | Submitting via Door 2 writes a complete row to Supabase | Same as above with submission_door = "Door 2" and parsed upload answers | [ ] |
-| 6 | tracking_id is unique and correctly formatted on every submission | Format `TCS-2026-000N`, no duplicates even under concurrent submissions | [ ] |
-| 7 | Confirmation email sends on submit | Supplier's contact_email receives a "We've received your submission" email | [ ] |
-| 8 | Email failure does not block or roll back the database write | Simulated email failure still results in a saved submission row | [ ] |
-| 9 | Anon key cannot read, update, or delete any row in `submissions` | Attempting a read/update/delete with the anon key from the browser fails | [ ] |
-| 10 | GDPR consent checkbox blocks submission | The Contact Step's Continue button cannot be clicked without the consent checkbox checked | [ ] |
-| 11 | Both Review screens display the Contact Step and Declaration details as a read-only summary | Company, contact name, email, phone, job title, signatory name, and declaration status all appear correctly on both Door 1 and Door 2 Review | [ ] |
-| 12 | Brand identity is applied correctly to the new Contact Step and Declaration views | Same fonts, colours, square corners, and lime usage rules as the rest of the tool | [ ] |
+| 6 | tracking_id is unique and correctly formatted on every submission, across both tables | Format `TCS-2026-000N`, no duplicates even under concurrent submissions, shared sequence across `submissions` and `ecovadis_submissions` | [ ] |
+| 7 | Confirmation email sends on submit, on all three paths | Supplier's contact_email receives a "We've received your submission" email from Door 1, Door 2, and the EcoVadis path | [ ] |
+| 8 | Email failure does not block or roll back the database write | Simulated email failure still results in a saved submission row on any of the three paths | [ ] |
+| 9 | Anon key cannot read, update, or delete any row in `submissions` or `ecovadis_submissions` | Attempting a read/update/delete with the anon key from the browser fails on both tables | [ ] |
+| 10 | GDPR consent checkbox blocks submission on all three paths | The Continue/Submit button cannot be clicked without the consent checkbox checked, on Door 1, Door 2, and the EcoVadis path | [ ] |
+| 11 | Both Review screens display the Contact Step and Declaration details as a read-only summary | Company, contact name, email, phone, job title, department, signatory name, and declaration status all appear correctly on both Door 1 and Door 2 Review | [ ] |
+| 12 | Brand identity is applied correctly to the new Contact Step, Declaration, and EcoVadis intake views | Same fonts, colours, square corners, and lime usage rules as the rest of the tool | [ ] |
 | 13 | Declaration step blocks progress on both doors | Continue disabled until Authorised Signatory Name is filled and the declaration checkbox is checked, on both Door 1 and Door 2 | [ ] |
 | 14 | Database rejects a submission missing the declaration | A direct insert attempt with `declaration_confirmed = false` fails against the `CHECK` constraint | [ ] |
 | 15 | Stepper on both doors starts at S2, not S1 | Door 1 stepper's first section is Climate & Decarbonisation (S2); Door 2's structural check validates against the S2–S7 + Declaration template | [ ] |
-| 16 | Tool deploys to Netlify with working Supabase and Resend connections | Live URL loads; a full test submission on each door succeeds end-to-end, including the email | [ ] |
+| 16 | EcoVadis intake writes a complete row and redirects | `ecovadis_submissions` gets a new row with tracking_id, all contact fields, ecovadis_link, and created_at; browser redirects to https://ecovadis.com in a new tab immediately after the write, with no confirmation screen shown first | [ ] |
+| 17 | Tool deploys to Netlify with working Supabase and Resend connections | Live URL loads; a full test submission on each of the three paths succeeds end-to-end, including the email | [ ] |
 
 ---
 
@@ -423,6 +451,7 @@ A supplier contacts sustainability@thecorporate.com to request deletion. The Cor
 | v2.0 | 03 September 2026 | Questionnaire route upgraded to two in-tool submission doors (guided form / download-upload). No email arm, no persistence — D2+A1, Tier 1. |
 | v3.0 | 14 September 2026 | Added a database (D3, Tier 2) so submissions persist and are reviewable by The Corporate. Each door gained a required Contact Step (company name, contact name, email, phone, job title, GDPR consent) as its opening step, ahead of any questionnaire content. Added an auto-generated tracking ID per submission. Added a confirmation email on submit (Email arm activated). No login introduced yet, but schema built to support one later without a rebuild. |
 | v3.1 | 15 September 2026 | Workbook's entire S1 section removed (legal name, primary contact, and the EcoVadis bypass question — not just the two fields anticipated in v3.0), so both doors' stepper/upload now run S2–S7. Added a required Declaration step (Authorised Signatory Name + a checkbox standing in for Signature/Digital Auth, submission date taken from `created_at`) as the final step before Review on both doors, sourced from the workbook's closing Declaration row. Added `authorised_signatory_name` and `declaration_confirmed` columns, the latter enforced by a database-level `CHECK` constraint. Flagged the workbook's now-orphaned S1 instructions text for correction before the file is committed. |
+| v3.2 | 15 September 2026 | The EcoVadis path is no longer a bare outbound link — it's now its own Contact & Scorecard intake step (matching an already-built screen), capturing company name, contact name, email, phone, job title, department, and the EcoVadis Scorecard Link, with the same GDPR consent pattern as the doors. Saves to a new `ecovadis_submissions` table, sends the same confirmation email, then redirects immediately to ecovadis.com in a new tab. Added `department` as a required field across all three paths (Door 1, Door 2, and EcoVadis), not just this new one. Updated the GDPR data statement and consent checkbox wording to match the already-built copy verbatim, applied consistently across all three paths. tracking_id is now a single sequence shared across both tables. |
 
 ---
 
