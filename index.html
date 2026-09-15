@@ -1294,6 +1294,101 @@
   }
   .confirm-meta-label { font-family: var(--tc-font-body); font-size: 10px; font-weight: 400; letter-spacing: 0.16em; text-transform: uppercase; color: var(--tc-stone); margin-bottom: 4px; }
   .confirm-meta-value { font-family: var(--tc-font-body); font-size: 14px; font-weight: 500; color: var(--tc-chalk); }
+  .confirm-note {
+    font-family: var(--tc-font-body);
+    font-size: 13px;
+    font-weight: 300;
+    line-height: 1.7;
+    color: var(--tc-ink);
+    border: 0.5px solid var(--tc-border-strong);
+    background: var(--tc-linen);
+    padding: var(--tc-space-md) var(--tc-space-lg);
+    margin-bottom: var(--tc-space-lg);
+  }
+  .confirm-note b { font-weight: 500; }
+
+  /* ── Contact Step / Declaration Step ─────────────────────────────────────── */
+  .contact-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--tc-space-lg);
+  }
+  @media (max-width: 620px) { .contact-grid { grid-template-columns: 1fr; } }
+  .contact-grid .field { margin-bottom: 0; }
+  .field-full { grid-column: 1 / -1; }
+
+  /* Custom square checkbox — square corners, Ink fill, Chalk tick, no shadow */
+  .check-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    cursor: pointer;
+  }
+  .tc-check {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 20px;
+    height: 20px;
+    flex: 0 0 20px;
+    margin: 1px 0 0;
+    border: 1px solid var(--tc-ink);
+    border-radius: 0;
+    background: var(--tc-white);
+    cursor: pointer;
+    position: relative;
+    transition: background 0.15s ease;
+  }
+  .tc-check:checked { background: var(--tc-ink); }
+  .tc-check:checked::after {
+    content: "";
+    position: absolute;
+    left: 6px;
+    top: 2px;
+    width: 5px;
+    height: 10px;
+    border: solid var(--tc-chalk);
+    border-width: 0 1.5px 1.5px 0;
+    transform: rotate(45deg);
+  }
+  .tc-check:focus-visible { outline: 2px solid var(--tc-ink); outline-offset: 2px; }
+
+  .consent { margin-top: var(--tc-space-sm); }
+  .consent-label {
+    font-family: var(--tc-font-body);
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--tc-stone);
+    margin-bottom: var(--tc-space-sm);
+  }
+  .consent-statement {
+    font-family: var(--tc-font-body);
+    font-size: 13px;
+    font-weight: 300;
+    line-height: 1.7;
+    color: var(--tc-ink);
+    margin-bottom: var(--tc-space-md);
+  }
+  .consent-statement a { color: var(--tc-ink); text-decoration: underline; text-underline-offset: 3px; }
+  .consent-text {
+    font-family: var(--tc-font-body);
+    font-size: 13px;
+    font-weight: 300;
+    line-height: 1.6;
+    color: var(--tc-ink);
+  }
+  .declaration-statement {
+    font-family: var(--tc-font-body);
+    font-size: 14px;
+    font-weight: 300;
+    line-height: 1.7;
+    color: var(--tc-ink);
+    border-left: 3px solid var(--tc-ink);
+    background: var(--tc-chalk);
+    padding: var(--tc-space-md) var(--tc-space-lg);
+    margin: var(--tc-space-lg) 0 var(--tc-space-md);
+  }
 </style>
 </head>
 <body>
@@ -1590,7 +1685,7 @@
       </div>
     </div>
     <div class="footer-meta">
-      <div>ESRS / CSRD Aligned · Version 2.0</div>
+      <div>ESRS / CSRD Aligned · Version 3.1</div>
       <div>Supplier Programme · 2026</div>
       <div style="margin-top:8px;">Scope 3: 71% of total footprint · location-based · 2023 base year</div>
       <div style="margin-top:8px;"><a href="mailto:sustainability@thecorporate.com">sustainability@thecorporate.com</a></div>
@@ -1615,9 +1710,10 @@
     <p class="flow-eyebrow">Full Questionnaire</p>
     <h1 class="flow-title">How would you like to complete this?</h1>
     <p class="flow-intro">
-      Choose the path that suits you. Both cover the same seven ESRS-aligned sections and
-      end with an on-screen confirmation. Nothing is saved until you submit, and nothing
-      leaves your browser.
+      Choose the path that suits you. Both cover the same ESRS-aligned sections (S2–S7) and
+      begin by capturing your organisation and contact details. Nothing is saved until you
+      submit; when you submit, your details and answers are recorded so The Corporate can
+      review them.
     </p>
     <div class="door-grid">
       <div class="door-card">
@@ -1627,7 +1723,7 @@
           Answer the questionnaire section by section, guided, directly in the portal.
           Dropdowns and required fields match the source workbook.
         </div>
-        <button type="button" class="tc-btn-primary" onclick="openDoor1()">Start Guided Form</button>
+        <button type="button" class="tc-btn-primary" onclick="startDoor1()">Start Guided Form</button>
       </div>
       <div class="door-card">
         <div class="door-card-tag tag-muted"><span>Door 2 — Download &amp; Upload</span></div>
@@ -1636,18 +1732,116 @@
           Download the workbook, complete it offline with your colleagues, then upload it
           back. The tool reads your answers for review before you submit.
         </div>
-        <button type="button" class="tc-btn-secondary" onclick="openDoor2()">Download &amp; Upload</button>
+        <button type="button" class="tc-btn-secondary" onclick="startDoor2()">Download &amp; Upload</button>
       </div>
     </div>
+  </div>
+</div>
+
+<!-- ══ VIEW: CONTACT STEP (shared — opening step of both doors) ══════════════ -->
+<div id="view-contact" class="view flow" hidden>
+  <div class="flow-wrap">
+    <button type="button" class="flow-back" onclick="backToPicker()">
+      <svg viewBox="0 0 24 24"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+      Back to options
+    </button>
+    <p class="flow-eyebrow" id="contact-eyebrow">Door 1 — Your details</p>
+    <h1 class="flow-title">Tell us who is submitting</h1>
+    <p class="flow-intro">
+      We capture your organisation and contact details before the questionnaire. All fields
+      are required. This is where The Corporate reaches you about your submission.
+    </p>
+    <form id="contact-form" class="form-section" novalidate autocomplete="off">
+      <div class="contact-grid">
+        <div class="field field-full">
+          <label class="field-label" for="c-company">Company name <span class="field-req">(required)</span></label>
+          <input type="text" class="field-input" id="c-company" autocomplete="organization">
+        </div>
+        <div class="field">
+          <label class="field-label" for="c-name">Contact name <span class="field-req">(required)</span></label>
+          <input type="text" class="field-input" id="c-name" autocomplete="name">
+        </div>
+        <div class="field">
+          <label class="field-label" for="c-job">Job title / role <span class="field-req">(required)</span></label>
+          <input type="text" class="field-input" id="c-job" autocomplete="organization-title">
+        </div>
+        <div class="field">
+          <label class="field-label" for="c-email">Contact email <span class="field-req">(required)</span></label>
+          <input type="email" class="field-input" id="c-email" autocomplete="email" inputmode="email">
+        </div>
+        <div class="field">
+          <label class="field-label" for="c-phone">Contact phone <span class="field-req">(required)</span></label>
+          <input type="tel" class="field-input" id="c-phone" autocomplete="tel" inputmode="tel">
+        </div>
+      </div>
+      <div class="tc-divider"></div>
+      <div class="consent">
+        <div class="consent-label">Data &amp; Privacy</div>
+        <p class="consent-statement">
+          Your data will be stored securely and used only to process your sustainability
+          assessment submission. You can request deletion at any time by contacting
+          <a href="mailto:sustainability@thecorporate.com?subject=Supplier Portal Help Desk Query">sustainability@thecorporate.com</a>.
+        </p>
+        <label class="check-row">
+          <input type="checkbox" class="tc-check" id="c-consent">
+          <span class="consent-text">I have read and consent to the above.</span>
+        </label>
+      </div>
+      <div id="contact-alert" class="form-alert" role="alert"></div>
+      <div class="flow-actions">
+        <button type="button" class="tc-btn-ghost" onclick="backToPicker()">Back</button>
+        <span class="spacer"></span>
+        <button type="button" class="tc-btn-primary" id="contact-continue" disabled>Continue</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ══ VIEW: DECLARATION STEP (shared — final step before Review, both doors) ═ -->
+<div id="view-declaration" class="view flow" hidden>
+  <div class="flow-wrap">
+    <button type="button" class="flow-back" id="declaration-back">
+      <svg viewBox="0 0 24 24"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+      Back
+    </button>
+    <p class="flow-eyebrow" id="declaration-eyebrow">Door 1 — Declaration</p>
+    <h1 class="flow-title">Authorised declaration</h1>
+    <p class="flow-intro">
+      Confirm this submission on behalf of your organisation. The submission date is recorded
+      automatically at the point you submit.
+    </p>
+    <form id="declaration-form" class="form-section" novalidate autocomplete="off">
+      <div class="field">
+        <label class="field-label" for="decl-name">Authorised Signatory Name <span class="field-req">(required)</span></label>
+        <input type="text" class="field-input" id="decl-name" autocomplete="name">
+      </div>
+      <div class="declaration-statement">
+        I confirm that the information provided in this assessment is accurate and complete to
+        the best of my knowledge.
+      </div>
+      <label class="check-row">
+        <input type="checkbox" class="tc-check" id="decl-confirm">
+        <span class="consent-text">
+          I confirm the declaration above on behalf of my organisation. This stands in for the
+          Signature / Digital Authorisation.
+        </span>
+      </label>
+      <div id="declaration-alert" class="form-alert" role="alert"></div>
+      <div class="flow-actions">
+        <button type="button" class="tc-btn-ghost" id="declaration-back-btn">Back</button>
+        <span class="spacer"></span>
+        <button type="button" class="tc-btn-primary" id="declaration-continue" disabled>Continue to review</button>
+      </div>
+    </form>
   </div>
 </div>
 
 <!-- ══ VIEW: DOOR 1 — GUIDED FORM ═══════════════════════════════════════════ -->
 <div id="view-door1" class="view flow" hidden>
   <div class="flow-wrap">
-    <button type="button" class="flow-back" onclick="backToPicker()">
+    <button type="button" class="flow-back" onclick="showContactStep()">
       <svg viewBox="0 0 24 24"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
-      Back to options
+      Back to details
     </button>
     <p class="flow-eyebrow">Door 1 — Guided Form</p>
     <div id="door1-stepper" class="stepper" role="tablist" aria-label="Questionnaire sections"></div>
@@ -1667,21 +1861,24 @@
 <!-- ══ VIEW: DOOR 1 — REVIEW ════════════════════════════════════════════════ -->
 <div id="view-door1review" class="view flow" hidden>
   <div class="flow-wrap">
-    <button type="button" class="flow-back" onclick="openDoor1()">
+    <button type="button" class="flow-back" onclick="openDeclaration()">
       <svg viewBox="0 0 24 24"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
-      Back to form
+      Back to declaration
     </button>
     <p class="flow-eyebrow">Door 1 — Review</p>
-    <h1 class="flow-title">Review your answers</h1>
+    <h1 class="flow-title">Review your submission</h1>
     <p class="flow-intro">
-      Check everything below before you submit. Use Edit to jump back to any section.
-      Submitting records your response in this tool only — nothing is sent, emailed, or stored.
+      Check everything below before you submit. Use Edit to jump back to any questionnaire
+      section. Your contact and declaration details are shown as read-only — to change them,
+      restart this door. Submitting records your response with The Corporate and sends a
+      confirmation to your contact email.
     </p>
     <div id="door1-review"></div>
+    <div id="door1-submit-alert" class="form-alert" role="alert"></div>
     <div class="flow-actions">
       <button type="button" class="tc-btn-ghost" onclick="openDoor1()">Continue editing</button>
       <span class="spacer"></span>
-      <button type="button" class="tc-btn-primary" onclick="submitDoor(1)">Submit Assessment</button>
+      <button type="button" class="tc-btn-primary" id="d1-submit" onclick="submitDoor(1)">Submit Assessment</button>
     </div>
   </div>
 </div>
@@ -1689,9 +1886,9 @@
 <!-- ══ VIEW: DOOR 2 — DOWNLOAD & UPLOAD ═════════════════════════════════════ -->
 <div id="view-door2" class="view flow" hidden>
   <div class="flow-wrap">
-    <button type="button" class="flow-back" onclick="backToPicker()">
+    <button type="button" class="flow-back" onclick="showContactStep()">
       <svg viewBox="0 0 24 24"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
-      Back to options
+      Back to details
     </button>
     <p class="flow-eyebrow">Door 2 — Download &amp; Upload</p>
     <h1 class="flow-title">Download, complete, upload</h1>
@@ -1736,22 +1933,24 @@
 <!-- ══ VIEW: DOOR 2 — REVIEW ════════════════════════════════════════════════ -->
 <div id="view-door2review" class="view flow" hidden>
   <div class="flow-wrap">
-    <button type="button" class="flow-back" onclick="openDoor2()">
+    <button type="button" class="flow-back" onclick="openDeclaration()">
       <svg viewBox="0 0 24 24"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
-      Back to upload
+      Back to declaration
     </button>
     <p class="flow-eyebrow">Door 2 — Review</p>
     <h1 class="flow-title">Review the parsed answers</h1>
     <p class="flow-intro">
       This is what the tool read from your file. If anything is wrong, correct the workbook
-      and upload it again — there is no in-tool editing on this path. Submitting records your
-      response in this tool only.
+      and upload it again — there is no in-tool editing on this path. Your contact and
+      declaration details are shown as read-only. Submitting records your response with The
+      Corporate and sends a confirmation to your contact email.
     </p>
     <div id="door2-review"></div>
+    <div id="door2-submit-alert" class="form-alert" role="alert"></div>
     <div class="flow-actions">
-      <button type="button" class="tc-btn-ghost" onclick="openDoor2()">Upload a different file</button>
+      <button type="button" class="tc-btn-ghost" onclick="showView('view-door2')">Upload a different file</button>
       <span class="spacer"></span>
-      <button type="button" class="tc-btn-primary" onclick="submitDoor(2)">Submit Assessment</button>
+      <button type="button" class="tc-btn-primary" id="d2-submit" onclick="submitDoor(2)">Submit Assessment</button>
     </div>
   </div>
 </div>
@@ -1763,9 +1962,9 @@
       <div class="confirm-hero-label">Submission Complete</div>
       <h1 class="confirm-hero-title">Your assessment has been received.</h1>
       <p class="confirm-hero-body">
-        Thank you. Your responses are recorded in this tool for this session. This on-screen
-        confirmation is your record — there is nothing further to do. Closing or reloading
-        this tab clears the submission.
+        Thank you. Your submission has been recorded with The Corporate. There is nothing
+        further to do — our EHS and Procurement teams will review it as part of the 2026
+        programme.
       </p>
       <div class="confirm-meta">
         <div>
@@ -1774,9 +1973,12 @@
         </div>
         <div>
           <div class="confirm-meta-label">Sections</div>
-          <div class="confirm-meta-value">S1–S7 · ESRS-aligned</div>
+          <div class="confirm-meta-value">S2–S7 · ESRS-aligned</div>
         </div>
       </div>
+    </div>
+    <div class="confirm-note" id="confirm-email-note">
+      A confirmation email has been sent to <b id="confirm-email">your contact address</b>.
     </div>
     <p class="flow-eyebrow">Summary of your submission</p>
     <div id="confirm-summary"></div>
@@ -1829,464 +2031,8 @@
 <!-- ── CLIENT-SIDE XLSX PARSER (vendored, no network) ─────────────────────── -->
 <script src="public/vendor/xlsx.full.min.js"></script>
 
-<!-- ── QUESTIONNAIRE FLOW LOGIC ───────────────────────────────────────────── -->
-<script>
-(function () {
-  "use strict";
-
-  /* ── Questionnaire model — extracted from The_Corporate_Supplier_Questionnaire_2026.xlsx.
-     Each field id is the source workbook cell in the SUPPLIER RESPONSE column (E). "row"
-     is the source Excel row, used by the Door 2 parser to locate each answer. ────────── */
-  var YESNO = ["Yes", "No"];
-  var SECTIONS = [
-    { code: "S1", title: "General Information & EcoVadis Bypass", esrs: "All ESRS", questions: [
-      { id: "E6", row: 6, esrs: "—", type: "Required", input: "text", required: true,
-        q: "Legal name and registered country of the responding entity." },
-      { id: "E7", row: 7, esrs: "—", type: "Required", input: "text", required: true,
-        q: "Primary contact name, title, and email address for this assessment." },
-      { id: "E8", row: 8, esrs: "Bypass", type: "Dropdown", input: "select", required: true,
-        options: ["Yes — Scorecard Attached", "No — Will Complete Questionnaire"],
-        q: "Do you hold a valid EcoVadis Sustainability Scorecard (issued within the last 12 months)?",
-        help: "If yes, paste your scorecard link in Notes / Evidence below. Sections S2–S7 are then optional." },
-      { id: "E9", row: 9, esrs: "—", type: "Conditional", input: "text",
-        requiredIf: { id: "E8", value: "Yes — Scorecard Attached" },
-        q: "EcoVadis Scorecard Link (if applicable). Paste URL or attach document reference." }
-    ]},
-    { code: "S2", title: "Climate & Decarbonisation", esrs: "ESRS E1", questions: [
-      { id: "E11", row: 11, esrs: "E1-4", type: "Quantitative", input: "text",
-        q: "Total Scope 1 emissions for last fiscal year (metric tonnes CO₂e). Include verification method." },
-      { id: "E12", row: 12, esrs: "E1-4", type: "Quantitative", input: "select",
-        options: ["Verified by Third Party", "Internally Calculated", "Estimated", "Not Tracked"],
-        q: "Total Scope 2 emissions for last fiscal year — market-based (metric tonnes CO₂e)." },
-      { id: "E13", row: 13, esrs: "E1-4", type: "Quantitative", input: "text",
-        q: "Total Scope 3 emissions for last fiscal year (metric tonnes CO₂e). Specify categories included." },
-      { id: "E14", row: 14, esrs: "E1-3", type: "Dropdown", input: "select", options: YESNO,
-        q: "Does your organisation have a Science-Based Target (SBTi) validated decarbonisation target?" },
-      { id: "E15", row: 15, esrs: "E1-2", type: "Open-Ended", input: "textarea",
-        q: "Describe your top three decarbonisation projects currently in progress or planned for the next 24 months. Include estimated tCO₂e reduction and the specific technology being utilised (e.g., electrification of heat, on-site renewables)." },
-      { id: "E16", row: 16, esrs: "E1-2", type: "Open-Ended", input: "textarea",
-        q: "What are the primary technical or financial barriers preventing you from reaching a 50% reduction in Scope 1 and 2 emissions by 2030?" }
-    ]},
-    { code: "S3", title: "Pollution & PFAS", esrs: "ESRS E2", questions: [
-      { id: "E18", row: 18, esrs: "E2-3", type: "Quantitative", input: "text",
-        q: "Total weight of substances of concern (REACH, SVHC list) used in production last fiscal year (kg)." },
-      { id: "E19", row: 19, esrs: "E2-3", type: "Dropdown", input: "select", options: YESNO,
-        q: "Do any of your products or production processes contain or utilise PFAS compounds (\"Forever Chemicals\")?" },
-      { id: "E20", row: 20, esrs: "E2-3", type: "Open-Ended", input: "textarea",
-        q: "If your products contain PFAS, detail your substitution roadmap. Have you identified viable non-PFAS alternatives? Provide your target date for a complete phase-out." },
-      { id: "E21", row: 21, esrs: "E2-2", type: "Open-Ended", input: "textarea",
-        q: "Describe your industrial wastewater treatment process. What specific measures are in place to ensure zero leakage of hazardous chemicals into local water systems?" }
-    ]},
-    { code: "S4", title: "Water & Marine Resources", esrs: "ESRS E3", questions: [
-      { id: "E23", row: 23, esrs: "E3-1", type: "Quantitative", input: "text",
-        q: "Total water withdrawal last fiscal year (m³). Specify source (municipal, groundwater, surface)." },
-      { id: "E24", row: 24, esrs: "E3-1", type: "Dropdown", input: "select", options: YESNO,
-        q: "Is your primary production facility located in a high-water-stress region (WRI Aqueduct score ≥3)?" },
-      { id: "E25", row: 25, esrs: "E3-2", type: "Open-Ended", input: "textarea",
-        q: "Provide details on any water-saving or closed-loop recycling projects implemented at your facility. How has your total water intensity (litres per unit produced) changed over the last three years?" },
-      { id: "E26", row: 26, esrs: "E3-2", type: "Open-Ended", input: "textarea",
-        q: "If your facility is in a high-water-stress region, what is your operational contingency plan for severe drought conditions to ensure supply continuity to The Corporate?" }
-    ]},
-    { code: "S5", title: "Circular Economy & Waste", esrs: "ESRS E5", questions: [
-      { id: "E28", row: 28, esrs: "E5-2", type: "Quantitative", input: "text",
-        q: "Total waste generated last fiscal year (tonnes). Breakdown: landfill / recycled / energy recovery / hazardous." },
-      { id: "E29", row: 29, esrs: "E5-4", type: "Quantitative", input: "text",
-        q: "Percentage of post-consumer recycled (PCR) content in the components supplied to The Corporate (%)." },
-      { id: "E30", row: 30, esrs: "E5-3", type: "Open-Ended", input: "textarea",
-        q: "How are you incorporating circularity into the specific components you supply to The Corporate? Examples: design for disassembly, modularity, or increasing PCR content." },
-      { id: "E31", row: 31, esrs: "E5-2", type: "Open-Ended", input: "textarea",
-        q: "Detail your strategy for achieving Zero Waste to Landfill. What are your primary waste streams, and what innovative recycling or upcycling initiatives have you launched recently?" }
-    ]},
-    { code: "S6", title: "Biodiversity & Ecosystems", esrs: "ESRS E4", questions: [
-      { id: "E33", row: 33, esrs: "E4-2", type: "Dropdown", input: "select", options: YESNO,
-        q: "Are any of your production sites located within or adjacent to (within 1 km) a protected area or biodiversity hotspot?" },
-      { id: "E34", row: 34, esrs: "E4-3", type: "Open-Ended", input: "textarea",
-        q: "Describe any initiatives taken to minimise the impact of your operations on local biodiversity. Include land-use management, native planting schemes, or light/noise pollution reduction." },
-      { id: "E35", row: 35, esrs: "E4-5", type: "Open-Ended", input: "textarea",
-        q: "Have you undertaken a biodiversity impact assessment (TNFD or equivalent) for your primary production sites? If yes, share key findings. If no, provide your target assessment date." }
-    ]},
-    { code: "S7", title: "Social, Labour & Governance", esrs: "ESRS S2 · G1", questions: [
-      { id: "E37", row: 37, esrs: "S2-1", type: "Dropdown", input: "select", options: YESNO,
-        q: "Does your organisation have a formal Human Rights and Labour Rights Policy, aligned with the UN Guiding Principles on Business and Human Rights?" },
-      { id: "E38", row: 38, esrs: "S2-2", type: "Dropdown", input: "select", options: YESNO,
-        q: "Have you conducted a human rights due diligence assessment of your Tier 1 and Tier 2 supply chains in the last 24 months?" },
-      { id: "E39", row: 39, esrs: "S2-4", type: "Open-Ended", input: "textarea",
-        q: "Describe the grievance mechanism available to workers in your supply chain. How many grievances were filed and resolved in the last 12 months?" },
-      { id: "E40", row: 40, esrs: "G1-1", type: "Dropdown", input: "select", options: YESNO,
-        q: "Does your organisation have a verified conflict minerals policy (3TG — tin, tantalum, tungsten, gold) in place, including OECD Due Diligence guidance compliance?" },
-      { id: "E41", row: 41, esrs: "G1-2", type: "Open-Ended", input: "textarea",
-        q: "Describe your supplier code of conduct and how compliance is monitored across your own supply chain. Include details of any third-party audits conducted in the last 24 months." }
-    ]}
-  ];
-
-  var EXPECTED_HEADERS = ["section", "esrs ref", "type", "question metric", "supplier response", "notes evidence", "status"];
-
-  /* ── State (session only; never persisted) ──────────────────────────────── */
-  var state = { door: null, section: 0, answers: {} };
-
-  function allQuestions() {
-    var out = [];
-    SECTIONS.forEach(function (s) {
-      s.questions.forEach(function (q) { q.section = s.code; out.push(q); });
-    });
-    return out;
-  }
-  function getAnswer(id) { return state.answers[id] || { response: "", notes: "" }; }
-
-  /* ── Utilities ──────────────────────────────────────────────────────────── */
-  function el(id) { return document.getElementById(id); }
-  function esc(str) {
-    return String(str == null ? "" : str)
-      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
-  }
-  // Normalise for structural matching: lowercase, keep only [a-z0-9 ], collapse spaces.
-  function norm(v) {
-    return String(v == null ? "" : v).toLowerCase().replace(/[^a-z0-9]+/g, " ").replace(/\s+/g, " ").trim();
-  }
-
-  /* ── View switching ─────────────────────────────────────────────────────── */
-  var VIEWS = ["view-landing", "view-doorpicker", "view-door1", "view-door1review",
-               "view-door2", "view-door2review", "view-confirm"];
-  function showView(id) {
-    VIEWS.forEach(function (v) {
-      var node = el(v);
-      if (!node) return;
-      if (v === id) { node.hidden = false; node.classList.add("is-active"); }
-      else { node.hidden = true; node.classList.remove("is-active"); }
-    });
-    window.scrollTo(0, 0);
-  }
-
-  /* ── Navigation entry points ────────────────────────────────────────────── */
-  window.goHome = function (evt) {
-    if (evt && evt.preventDefault) evt.preventDefault();
-    showView("view-landing");
-  };
-  window.startQuestionnaire = function () { showView("view-doorpicker"); };
-  window.backToPicker = function () { showView("view-doorpicker"); };
-
-  /* ── DOOR 1 — guided stepper ────────────────────────────────────────────── */
-  window.openDoor1 = function (sectionIndex) {
-    state.door = 1;
-    if (typeof sectionIndex === "number") state.section = sectionIndex;
-    if (state.section < 0 || state.section >= SECTIONS.length) state.section = 0;
-    renderSection(state.section);
-    showView("view-door1");
-  };
-
-  function renderStepper() {
-    var wrap = el("door1-stepper");
-    wrap.innerHTML = SECTIONS.map(function (s, i) {
-      var cls = "stepper-item" + (i === state.section ? " is-current" : (i < state.section ? " is-done" : ""));
-      return '<button type="button" class="' + cls + '" role="tab" aria-selected="' + (i === state.section) +
-        '" onclick="jumpSection(' + i + ')">' +
-        '<span class="stepper-code">' + esc(s.code) + '</span>' +
-        '<span class="stepper-name">' + esc(s.title) + '</span></button>';
-    }).join("");
-    el("door1-count").textContent = "Section " + (state.section + 1) + " of " + SECTIONS.length;
-  }
-
-  function fieldMarkup(qn) {
-    var a = getAnswer(qn.id);
-    var required = qn.required || (qn.requiredIf && getAnswer(qn.requiredIf.id).response === qn.requiredIf.value);
-    var reqMark = required ? ' <span class="field-req" aria-hidden="true">(required)</span>' : "";
-    var control;
-    if (qn.input === "select") {
-      var opts = ['<option value="">Select…</option>'].concat(qn.options.map(function (o) {
-        return '<option value="' + esc(o) + '"' + (a.response === o ? " selected" : "") + ">" + esc(o) + "</option>";
-      })).join("");
-      control = '<select class="field-select" id="f-' + qn.id + '" data-qid="' + qn.id + '">' + opts + "</select>";
-    } else if (qn.input === "textarea") {
-      control = '<textarea class="field-textarea" id="f-' + qn.id + '" data-qid="' + qn.id + '" rows="3">' + esc(a.response) + "</textarea>";
-    } else {
-      control = '<input type="text" class="field-input" id="f-' + qn.id + '" data-qid="' + qn.id + '" value="' + esc(a.response) + '">';
-    }
-    return '<div class="field" id="field-' + qn.id + '">' +
-      '<div class="field-meta">' +
-        (qn.esrs && qn.esrs !== "—" ? '<span class="field-ref">' + esc(qn.esrs) + "</span>" : "") +
-        '<span class="field-type">' + esc(qn.type) + "</span>" +
-      "</div>" +
-      '<label class="field-label" for="f-' + qn.id + '">' + esc(qn.q) + reqMark + "</label>" +
-      (qn.help ? '<div class="field-help">' + esc(qn.help) + "</div>" : "") +
-      control +
-      '<label class="field-notes-label" for="n-' + qn.id + '">Notes / Evidence (optional)</label>' +
-      '<textarea class="field-textarea" id="n-' + qn.id + '" data-nid="' + qn.id + '" rows="2" style="min-height:60px;">' + esc(a.notes) + "</textarea>" +
-      '<div class="field-error" id="err-' + qn.id + '">This field is required.</div>' +
-      "</div>";
-  }
-
-  function renderSection(idx) {
-    var s = SECTIONS[idx];
-    renderStepper();
-    el("door1-section").innerHTML =
-      '<div class="form-section">' +
-        '<div class="form-section-head">' +
-          '<div class="form-section-esrs"><span>' + esc(s.esrs) + "</span></div>" +
-          '<div class="form-section-title">' + esc(s.code) + " · " + esc(s.title) + "</div>" +
-        "</div>" +
-        s.questions.map(fieldMarkup).join("") +
-      "</div>";
-    hideAlert();
-    el("door1-back").textContent = idx === 0 ? "Back to options" : "Back";
-    el("door1-next").textContent = idx === SECTIONS.length - 1 ? "Review Answers" : "Next";
-    // Live-toggle the EcoVadis link's required marker on S1.
-    var bypass = el("f-E8");
-    if (bypass) bypass.addEventListener("change", function () {
-      saveCurrentSection();
-      renderSection(idx);
-    });
-  }
-
-  function saveCurrentSection() {
-    var s = SECTIONS[state.section];
-    s.questions.forEach(function (qn) {
-      var f = el("f-" + qn.id), n = el("n-" + qn.id);
-      if (f || n) {
-        state.answers[qn.id] = {
-          response: f ? String(f.value).trim() : getAnswer(qn.id).response,
-          notes: n ? String(n.value).trim() : getAnswer(qn.id).notes
-        };
-      }
-    });
-  }
-
-  window.jumpSection = function (i) {
-    saveCurrentSection();
-    state.section = i;
-    renderSection(i);
-    window.scrollTo(0, 0);
-  };
-
-  function goNext() {
-    saveCurrentSection();
-    if (state.section < SECTIONS.length - 1) {
-      state.section++;
-      renderSection(state.section);
-      window.scrollTo(0, 0);
-    } else {
-      goToReview();
-    }
-  }
-  function goBack() {
-    saveCurrentSection();
-    if (state.section === 0) { backToPicker(); return; }
-    state.section--;
-    renderSection(state.section);
-    window.scrollTo(0, 0);
-  }
-
-  function validateAll() {
-    var errors = [];
-    allQuestions().forEach(function (qn) {
-      var required = qn.required || (qn.requiredIf && getAnswer(qn.requiredIf.id).response === qn.requiredIf.value);
-      if (required && !getAnswer(qn.id).response) errors.push(qn);
-    });
-    return errors;
-  }
-
-  function goToReview() {
-    var errors = validateAll();
-    if (errors.length) {
-      // Jump to the first section holding an error and flag the fields.
-      var firstId = errors[0].id;
-      var secIdx = 0;
-      SECTIONS.forEach(function (s, i) { if (s.questions.some(function (q) { return q.id === firstId; })) secIdx = i; });
-      state.section = secIdx;
-      renderSection(secIdx);
-      errors.forEach(function (qn) {
-        var field = el("field-" + qn.id);
-        if (field) field.classList.add("has-error");
-      });
-      showAlert("Please complete the required fields marked below before continuing.");
-      var firstField = el("field-" + firstId);
-      if (firstField && firstField.scrollIntoView) firstField.scrollIntoView({ behavior: "smooth", block: "center" });
-      return;
-    }
-    renderReview("door1-review", true);
-    showView("view-door1review");
-  }
-
-  function showAlert(msg) { var a = el("door1-alert"); a.textContent = msg; a.classList.add("is-visible"); }
-  function hideAlert() { var a = el("door1-alert"); a.classList.remove("is-visible"); a.textContent = ""; }
-
-  /* ── Shared review / summary renderer ───────────────────────────────────── */
-  function renderReview(containerId, editable) {
-    el(containerId).innerHTML = SECTIONS.map(function (s, i) {
-      var rows = s.questions.map(function (qn) {
-        var a = getAnswer(qn.id);
-        var answered = a.response !== "";
-        return '<div class="review-row">' +
-          '<div class="review-q">' + esc(qn.q) + "</div>" +
-          '<div class="review-a' + (answered ? "" : " is-empty") + '">' +
-            (answered ? esc(a.response) : "Not answered") + "</div>" +
-          (a.notes ? '<div class="review-notes"><b>Notes / Evidence</b><br>' + esc(a.notes) + "</div>" : "") +
-          "</div>";
-      }).join("");
-      var edit = editable
-        ? '<button type="button" class="review-edit" onclick="editSection(' + i + ')">Edit</button>'
-        : "";
-      return '<div class="review-group">' +
-        '<div class="review-group-head">' +
-          '<div class="review-group-title">' + esc(s.code) + " · " + esc(s.title) + "</div>" +
-          edit +
-        "</div>" + rows + "</div>";
-    }).join("");
-  }
-
-  window.editSection = function (i) { openDoor1(i); };
-
-  /* ── DOOR 2 — download & upload ─────────────────────────────────────────── */
-  window.openDoor2 = function () {
-    state.door = 2;
-    clearUpload();
-    showView("view-door2");
-  };
-
-  window.clearUpload = function () {
-    var input = el("upload-input");
-    if (input) input.value = "";
-    var f = el("upload-file"); if (f) f.hidden = true;
-    var rej = el("upload-reject"); if (rej) rej.classList.remove("is-visible");
-  };
-
-  function showReject(title, bodyHtml) {
-    var rej = el("upload-reject");
-    rej.querySelector(".upload-reject-title").textContent = title;
-    el("upload-reject-body").innerHTML = bodyHtml;
-    rej.classList.add("is-visible");
-  }
-
-  function readFile(file) {
-    return new Promise(function (resolve, reject) {
-      var r = new FileReader();
-      r.onload = function () { resolve(r.result); };
-      r.onerror = function () { reject(new Error("read")); };
-      r.readAsArrayBuffer(file);
-    });
-  }
-
-  function handleFile(file) {
-    if (!file) return;
-    el("upload-reject").classList.remove("is-visible");
-    el("upload-file").hidden = false;
-    el("upload-file-name").textContent = file.name;
-
-    var ext = (file.name.split(".").pop() || "").toLowerCase();
-    if (ext !== "xlsx" && ext !== "csv") {
-      showReject("Unsupported file type",
-        "Upload the <code>.xlsx</code> workbook or its <code>.csv</code> export. The file you chose is <code>." +
-        esc(ext || "unknown") + "</code>. Nothing was imported.");
-      return;
-    }
-    if (file.size === 0) {
-      showReject("The file is empty", "This file has no content. Complete the downloaded workbook, then upload it again.");
-      return;
-    }
-
-    readFile(file).then(function (buf) {
-      var wb;
-      try {
-        wb = XLSX.read(new Uint8Array(buf), { type: "array" });
-      } catch (e) {
-        showReject("Could not read this file",
-          "The tool could not open this as a workbook or CSV export. Re-download the assessment, complete it, and upload the .xlsx or its CSV export. Nothing was imported.");
-        return;
-      }
-      if (!wb.SheetNames.length) { showReject("Empty workbook", "This workbook has no sheets. Nothing was imported."); return; }
-      var ws = wb.Sheets[wb.SheetNames[0]];
-      var rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false, defval: "" });
-      var res = validateAndParse(rows);
-      if (!res.ok) {
-        showReject("This file does not match the 2026 template", res.message + " No partial data has been imported — the whole file was rejected.");
-        return;
-      }
-      state.door = 2;
-      state.answers = res.answers;
-      renderReview("door2-review", false);
-      showView("view-door2review");
-    }).catch(function () {
-      showReject("Could not read this file", "Something went wrong reading the file. Please try again. Nothing was imported.");
-    });
-  }
-
-  function validateAndParse(rows) {
-    if (!rows || !rows.length) return { ok: false, message: "The file has no rows." };
-    // Locate the header row.
-    var h = -1;
-    for (var i = 0; i < rows.length; i++) {
-      var r = rows[i] || [];
-      if (norm(r[0]) === "section" && norm(r[4]).indexOf("supplier response") === 0) { h = i; break; }
-    }
-    if (h === -1) {
-      return { ok: false, message: "The header row (SECTION · ESRS REF · TYPE · QUESTION / METRIC · SUPPLIER RESPONSE · NOTES / EVIDENCE · STATUS) could not be found." };
-    }
-    var hdr = rows[h];
-    for (var c = 0; c < EXPECTED_HEADERS.length; c++) {
-      if (norm(hdr[c]) !== EXPECTED_HEADERS[c]) {
-        return { ok: false, message: "Column " + String.fromCharCode(65 + c) + " header does not match the template (expected “" + EXPECTED_HEADERS[c].toUpperCase() + "”)." };
-      }
-    }
-    // In the template the header sits on Excel row 3 (array index 2); compute any shift.
-    var offset = h - 2;
-    var answers = {};
-    var qs = allQuestions();
-    for (var k = 0; k < qs.length; k++) {
-      var qn = qs[k];
-      var idx = (qn.row - 1) + offset;
-      var row = rows[idx] || [];
-      var got = norm(row[3]);
-      var want = norm(qn.q);
-      var key = want.slice(0, 24);
-      if (got.indexOf(key) !== 0 && got !== want) {
-        return { ok: false, message: "The question at section " + qn.section + " (row for " + qn.esrs + ") does not match the template. This may be a different version of the questionnaire." };
-      }
-      answers[qn.id] = { response: String(row[4] == null ? "" : row[4]).trim(), notes: String(row[5] == null ? "" : row[5]).trim() };
-    }
-    return { ok: true, answers: answers };
-  }
-
-  /* ── Submit (client-side state transition only — no network, ever) ──────── */
-  window.submitDoor = function (door) {
-    if (door === 1) {
-      var errors = validateAll();
-      if (errors.length) { openDoor1(); goToReview(); return; }
-    }
-    state.door = door;
-    el("confirm-door").textContent = door === 1 ? "Door 1 — Guided Form" : "Door 2 — Download & Upload";
-    renderReview("confirm-summary", false);
-    showView("view-confirm");
-  };
-
-  /* ── Wire up Door 1 nav + Door 2 upload once the DOM is ready ────────────── */
-  function init() {
-    var nextBtn = el("door1-next"), backBtn = el("door1-back");
-    if (nextBtn) nextBtn.addEventListener("click", goNext);
-    if (backBtn) backBtn.addEventListener("click", goBack);
-
-    var zone = el("upload-zone"), input = el("upload-input");
-    if (zone && input) {
-      zone.addEventListener("click", function () { input.click(); });
-      zone.addEventListener("keydown", function (e) {
-        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); input.click(); }
-      });
-      input.addEventListener("change", function () { handleFile(input.files && input.files[0]); });
-      ["dragenter", "dragover"].forEach(function (ev) {
-        zone.addEventListener(ev, function (e) { e.preventDefault(); zone.classList.add("is-drag"); });
-      });
-      ["dragleave", "drop"].forEach(function (ev) {
-        zone.addEventListener(ev, function (e) { e.preventDefault(); zone.classList.remove("is-drag"); });
-      });
-      zone.addEventListener("drop", function (e) {
-        var dt = e.dataTransfer;
-        if (dt && dt.files && dt.files.length) handleFile(dt.files[0]);
-      });
-    }
-  }
-  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
-  else init();
-})();
-</script>
+<!-- ── QUESTIONNAIRE FLOW LOGIC (external file; no keys, no secrets) ────── -->
+<script src="public/app.js"></script>
 
 </body>
 </html>
