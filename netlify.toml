@@ -1,9 +1,19 @@
 # Netlify configuration — The Corporate Supplier Sustainability Portal 2026
-# Tier 1: static site, no build step, no backend. Auto-deploys from main.
+# Tier 2: static site + Netlify Functions (Supabase config + confirmation email).
+# No build step. Auto-deploys from the connected branch.
 
 [build]
   # The site is plain HTML/CSS/JS served from the repository root.
   publish = "."
+
+[build.environment]
+  # Functions use the global fetch API (Node 18+).
+  NODE_VERSION = "20"
+
+[functions]
+  # Runtime endpoints: /.netlify/functions/config and /.netlify/functions/send-confirmation
+  directory = "netlify/functions"
+  node_bundler = "esbuild"
 
 # The single page loads all views client-side, so no SPA redirects are needed.
 # Static assets (workbook, PDFs) live under /public/assets/ and vendored JS under

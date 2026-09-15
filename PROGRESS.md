@@ -4,86 +4,117 @@
 > anything. Update it at every save point. Replace content — do not append.
 > History lives in git.
 
-**Session:** 1 — v2.0 two-door flow built
-**Last updated:** 3 September 2026
-**Live URL:** none yet — ready to deploy (see Remaining work)
+**Session:** 2 — v3.1 build (Supabase persistence, Contact + Declaration steps, email arm)
+**Last updated:** 15 September 2026
+**Live URL:** none yet — built and tested locally; deploy pending (env vars + Netlify)
 
 ## Current state
-v2.0 is built as a single static page (`index.html`) that serves the landing
-page plus the full questionnaire flow via client-side view switching. No backend,
-no database, no network calls — D2+A1, Tier 1. All deployment files are in place.
 
-Flow implemented and tested end-to-end:
-- **Landing page** — carried over from v1.0. The "Two Routes" section now routes
-  Path A ("Submit EcoVadis Scorecard") to https://ecovadis.com in a new tab, and
-  Path B ("Start Questionnaire") to the Door Picker. Neither route is gated/hidden.
-- **Door Picker** — two cards (Fill In The Tool / Download & Upload) + back link.
-- **Door 1** — S1–S7 guided stepper with a clickable progress indicator; fields,
-  dropdowns, and validation extracted from the real workbook; Back/Next; S7 Next →
-  Door 1 Review.
-- **Door 1 Review** — grouped read-only answers with per-section Edit.
-- **Door 2** — Download Assessment button + drag/drop or click upload (.xlsx or
-  CSV export), parsed client-side with SheetJS. All-or-nothing rejection with an
-  on-screen explanation on any structural mismatch.
-- **Door 2 Review** — grouped read-only parsed answers, no Edit.
-- **Confirmation** — shared by both doors; section-by-section summary, door used,
-  no print/save/export. Submit is a client-side state transition only.
+v3.1 is built on top of the v2.0 single static page (`index.html`), now with the
+questionnaire logic in `public/app.js` and two Netlify Functions. Tier 2 — D3+A1.
+
+Flow implemented and tested end-to-end (jsdom walkthrough, 51/51 checks):
+- **Landing page / Door Picker** — routing unchanged from v2.0. Door Picker intro
+  copy corrected (data now persists; the old "nothing leaves your browser" line was
+  removed as it contradicted the new GDPR notice).
+- **Contact Step (new, shared by both doors)** — company, contact name, job title,
+  email, phone (all required) + GDPR consent checkbox with the exact spec statement.
+  Continue is disabled until all fields are valid and consent is ticked. Door 1 →
+  stepper; Door 2 → download.
+- **Door 1 stepper** — now S2–S7 (S1 removed), extracted from the updated workbook.
+  S7 "Next" → Declaration.
+- **Declaration Step (new, shared)** — Authorised Signatory Name + required checkbox
+  standing in for Signature/Digital Auth. Continue disabled until both complete.
+  Date is taken from `created_at`, not collected.
+- **Door 2** — Contact Step → Download → Upload/Parse (all-or-nothing structural check,
+  now validating the S2–S7 **+ Declaration** template) → Declaration → Review.
+- **Both Review screens** — Contact Details and Declaration read-only summary blocks
+  above the questionnaire sections (no Edit on those blocks). Door 1 keeps per-section
+  Edit; Door 2 does not.
+- **Submit** — writes the full record to Supabase `submissions` via a direct browser
+  insert (insert-only anon key from the `config` function), fires the confirmation
+  email (Netlify Function, independent of the write), then shows Confirmation. Insert
+  failure keeps the user on Review with a retry message; email failure never blocks.
+- **Confirmation** — persistence-accurate copy + a note that a confirmation email was
+  sent to the contact email. No print/save/export.
+
+Database (`the-corporate-esg`, `wrylehuacuhwdvxajtdc`, EU Frankfurt) built and verified
+— see `docs/supabase-setup.md`.
 
 ## Last session
-Session 1 (this one). First Session Setup completed: moved `product-spec.md` into
-`docs/`, created `public/assets/` (workbook + the two linked PDFs) and
-`public/vendor/` (vendored SheetJS), installed the-corporate-brand skill to
-`.claude/skills/`, renamed the v1.0 landing page to `index.html` and built the
-v2.0 flow on top of it. Verified with a parser test suite (12 checks), a full
-jsdom walkthrough (24 checks), a static-serve smoke test, and Chromium screenshots
-(desktop + mobile).
+
+Session 2 (this one). Placed the v3.1 docs; corrected the workbook's orphaned S1
+instruction cell (A4) and replaced the asset; built the `submissions` table, the
+per-year atomic `tracking_id` (counter table + SECURITY DEFINER trigger), the
+`CHECK(declaration_confirmed = true)` constraint, and insert-only anon RLS; rebuilt
+the field model to S2–S7; added the Contact + Declaration steps and rewired both door
+flows; moved the questionnaire logic to `public/app.js`; added the `config` and
+`send-confirmation` Netlify Functions. Verified with a 51-check jsdom walkthrough
+(flow, gating, submit wiring, email independence, parser against the real workbook),
+DB tests (tracking_id uniqueness + format, CHECK rejects `false`, anon read/update/
+delete denied + insert allowed), a static-serve smoke test, and Chromium screenshots
+of the new views (brand-compliant).
 
 ## Remaining work
-- [ ] Deploy to Netlify and record the live URL here. Netlify MCP was not active
-      in this session (no Netlify tools available) — deploy via GitHub → Netlify:
-      connect the repo, set publish directory to the repo root (already declared in
-      `netlify.toml`), no build command. Then run Acceptance Criteria #15 against
-      the live URL (Excel + PDFs download; no 404s; mobile).
-- [ ] Confirm the two resource PDFs are the correct/current documents (they were
-      wired from the PDFs already in the repo — see Build decisions).
+
+- [ ] **Deploy to Netlify** and record the live URL here — see `docs/netlify-deployment.md`.
+      Netlify MCP was not available this session, so the builder (or a session with
+      Netlify access) sets the env vars and deploys.
+- [ ] **Create the Resend API key** (`re_…`) and set `RESEND_API_KEY` in Netlify — the
+      email arm is dormant until then (submissions still save). Optionally set a
+      verified `RESEND_FROM` sender.
+- [ ] Set `SUPABASE_URL`, `SUPABASE_ANON_KEY` (publishable), and
+      `SUPABASE_SERVICE_ROLE_KEY` (unused) in Netlify.
+- [ ] Run Acceptance Criteria #16 against the live URL (full submission on each door,
+      including the email).
+- [ ] Consider rotating the Supabase secret key (shared in chat during the build).
+- [ ] (Owner's discretion) harden the pre-existing `rls_auto_enable()` event-trigger
+      function (revoke EXECUTE from anon/authenticated) — flagged by the Supabase
+      linter; not created by this build, negligible risk.
+- [ ] Confirm the two resource PDFs are the intended current versions (carried from v2.0).
 
 ## Build decisions
-- **One page, JS view switching.** `index.html` holds all views; only one is shown
-  at a time. No routing, no framework, no build step — matches spec Section 4.
-- **Deployment layout.** Downloadable/linked static assets live in
-  `public/assets/` (matches CLAUDE.md's `/public/assets/` path); vendored JS in
-  `public/vendor/`. `netlify.toml` publishes from the repo root, so those literal
-  paths resolve. Reference PDFs moved to `docs/`.
-- **SheetJS vendored, not CDN.** cdnjs is blocked by egress policy and a runtime
-  CDN dependency is a reliability risk for a deployed portal, so `xlsx.full.min.js`
-  (v0.18.5) is committed under `public/vendor/` and parsing works offline.
-- **Field model faithful to the workbook.** The 30 S1–S7 questions, their input
-  types, and dropdown option lists are extracted verbatim from
-  `The_Corporate_Supplier_Questionnaire_2026.xlsx` (column D questions, column E
-  data-validation lists). Each question also captures a Notes / Evidence field
-  (workbook column F). Note quirk carried faithfully: the S2 Scope 2 response cell
-  (E12) is a verification-method dropdown in the source file, so it renders as one.
-- **Validation.** Only the workbook's REQUIRED/Conditional fields are enforced:
-  S1 legal name, S1 primary contact, and the EcoVadis bypass answer are required;
-  the EcoVadis link is required only when bypass = "Yes — Scorecard Attached".
-  Everything else is optional, so a partially completed workbook is accepted (both
-  doors), per the business rules.
-- **Door 2 rejection is structural + all-or-nothing.** The parser locates the
-  header row, checks all seven column headers, then confirms every question row
-  matches the template before extracting. Any mismatch rejects the whole file with
-  a specific message; nothing is partially imported.
-- **Resource links resolved.** "View Document" and "View Policy" now point at the
-  Supplier Code of Conduct and Global Environmental Policy PDFs in
-  `public/assets/` (they were already in the repo), replacing v1.0's `#`
-  placeholders.
-- **Landing kept, EcoVadis de-gated.** The v1.0 qualification decision tree is kept
-  but no longer disables either path (removed `pointer-events:none`), honouring the
-  "never gates or hides either route" rule.
+
+- **Questionnaire logic externalised** to `public/app.js` (was inline in `index.html`).
+  Cleaner for a large v3 rewrite; keeps zero build step. Landing-page decision-tree
+  script stays inline; SheetJS stays vendored under `public/vendor/`.
+- **Runtime config endpoint for DB keys.** Per the Hard Rule (no keys in committed
+  files), the browser fetches `{ url, anonKey }` from `/.netlify/functions/config` at
+  load, then does the direct insert with the insert-only anon key. This keeps the
+  spec's RLS model (anon insert-only, used from the browser — acceptance #9 stays
+  meaningful) while nothing is hardcoded.
+- **Direct PostgREST insert, no supabase-js.** The insert is a single `fetch` POST to
+  `/rest/v1/submissions` with `Prefer: return=minimal` (anon has no read policy, so we
+  never read back). Avoids vendoring another library.
+- **tracking_id via counter table + SECURITY DEFINER trigger**, not a raw sequence, so
+  it resets per calendar year and stays atomic/concurrency-safe (`ON CONFLICT` row
+  lock), with `UNIQUE(tracking_id)` as backstop.
+- **Contact/Declaration are shared views** (one `#view-contact`, one
+  `#view-declaration`) reused by both doors and routed by `state.door` — guarantees the
+  spec's "identical on both doors".
+- **Email is fire-and-forget** after the insert resolves, so a Resend failure can never
+  block or roll back the write.
+- **All S2–S7 answers optional.** With S1 removed, there are no required questionnaire
+  fields; only the Contact Step and Declaration gate submission (client-side + the DB
+  CHECK/RLS as backstop).
+- **Door 2 structural check** now also requires the closing Declaration row, matching
+  the S2–S7 + Declaration template.
 
 ## Known issues
-- Not yet deployed — no live URL. Netlify MCP was not available this session.
-- The two resource PDFs are wired from files already present in the repo; confirm
-  they are the intended current versions (low risk).
+
+- Not yet deployed — no live URL; email arm dormant until `RESEND_API_KEY` is set.
+- The key pasted in the build session (`sb_secret_…`) is the Supabase **secret** key,
+  not a Resend key — mapped to the (unused) `SUPABASE_SERVICE_ROLE_KEY`. Rotate it.
+- Landing page left unchanged per spec (criterion #1); the Path B blurb still says
+  "7 sections" / "No email required" — factually loose now (6 sections; a confirmation
+  email is sent) but low-risk marketing copy. Only the Door Picker + Confirmation copy
+  that made false data-handling claims was corrected.
+- GDPR note carried from v3.1: the spec's "Personal data collected" list (Section 7)
+  names the five Contact fields but not `authorised_signatory_name`, which is also
+  personal data. Built per spec; worth the spec author adding it to Section 7.
+- `submission_counters` shows as INFO `rls_enabled_no_policy` in the Supabase linter —
+  intentional (locked to the definer trigger + service role).
 
 ## Notes for next session
+
 None.
