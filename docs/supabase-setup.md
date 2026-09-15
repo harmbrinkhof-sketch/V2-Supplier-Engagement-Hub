@@ -4,7 +4,7 @@
 > over the schema sketch in CLAUDE.md. Update it at every save point that touches
 > the database (table, policy, function, or auth change).
 
-**Last updated:** 15 September 2026 · Session 2 (v3.1 build)
+**Last updated:** 15 September 2026 · Session 3 (v3.2 build)
 
 ## Project
 
@@ -37,6 +37,7 @@ declaration). Written by the public site with the anon/publishable key.
 | `contact_email` | text | NO | Contact Step — also the confirmation-email recipient |
 | `contact_phone` | text | NO | Contact Step |
 | `contact_job_title` | text | NO | Contact Step |
+| `department` | text | NO | Contact Step — **added v3.2** (session 3); now a required field on all three paths |
 | `submission_door` | text | NO | **CHECK** `submission_door IN ('Door 1','Door 2')` |
 | `questionnaire_answers` | jsonb | NO | Default `'{}'`. Keyed by workbook response-cell id (`E6`…`E36`), each `{ "response": "...", "notes": "..." }` |
 | `authorised_signatory_name` | text | NO | Declaration step |
@@ -70,8 +71,12 @@ linter flags this as INFO `rls_enabled_no_policy` — that is intentional and co
 
 `public.assign_tracking_id()` — `plpgsql`, `SECURITY DEFINER`, `search_path = public`,
 `EXECUTE` revoked from `public`/`anon`/`authenticated` (trigger-only; not callable via
-the REST RPC endpoint). Fired `BEFORE INSERT ... FOR EACH ROW` on `submissions` by
-trigger `trg_assign_tracking_id`.
+the REST RPC endpoint). Fired `BEFORE INSERT ... FOR EACH ROW` by a trigger named
+`trg_assign_tracking_id` on **both** `submissions` and (v3.2) `ecovadis_submissions`.
+The function body is table-agnostic — it only touches `submission_counters`,
+`new.created_at`, and `new.tracking_id` — so attaching the same trigger to a second
+table makes both tables draw from the **same** per-year counter row: one continuous
+`tracking_id` sequence across the two tables, never a separate count per table.
 
 Logic (atomic, concurrency-safe):
 ```sql
@@ -112,6 +117,64 @@ inserted. This was verified this session as the `anon` role:
 `service_role` bypasses RLS (used only from the Supabase dashboard / server side in a
 future build; the service-role key has no use in the current frontend or functions).
 
+## Table: `public.ecovadis_submissions` (added v3.2 — session 3)
+
+One row per EcoVadis-path submission: contact details + the scorecard link. No
+questionnaire or declaration data. Written by the public site with the anon key, on
+the new EcoVadis Contact & Scorecard intake step, immediately before the browser is
+redirected to ecovadis.com.
+
+| Column | Type | Null | Notes |
+|--------|------|------|-------|
+| `id` | uuid | NO | Primary key, default `gen_random_uuid()` |
+| `tracking_id` | text | (set by trigger) | **UNIQUE**. Format `TCS-YYYY-NNNN`. Assigned by the shared `assign_tracking_id` BEFORE INSERT trigger — same sequence as `submissions` |
+| `company_name` | text | NO | EcoVadis intake |
+| `contact_name` | text | NO | EcoVadis intake |
+| `contact_email` | text | NO | EcoVadis intake — also the confirmation-email recipient |
+| `contact_phone` | text | NO | EcoVadis intake |
+| `contact_job_title` | text | NO | EcoVadis intake |
+| `department` | text | NO | EcoVadis intake |
+| `ecovadis_link` | text | NO | EcoVadis intake — full scorecard URL (validated as an http/https URL client-side) |
+| `created_at` | timestamptz | NO | Default `now()` |
+
+Index: `ecovadis_submissions_created_at_idx` on `(created_at desc)`.
+
+There is **no** declaration on this path, so this table has no `declaration_confirmed`
+column and no equivalent CHECK constraint (unlike `submissions`).
+
+### Constraints (verified)
+- `ecovadis_submissions_pkey` — PRIMARY KEY (`id`)
+- `ecovadis_submissions_tracking_id_key` — UNIQUE (`tracking_id`)
+
+### Trigger
+- `trg_assign_tracking_id` — BEFORE INSERT, runs the shared `public.assign_tracking_id()`
+  function so this table draws `tracking_id` from the **same** `submission_counters`
+  per-year row as `submissions`. Verified this session: a row in each table, inserted
+  back to back, received `TCS-2026-0001` and `TCS-2026-0002` (test rows removed and the
+  counter reset to 0 afterward — the table is empty and pristine).
+
+### RLS policies on `public.ecovadis_submissions` (verified)
+
+RLS is **enabled**. Table privileges: `anon` has `INSERT` only; `service_role` has all
+(`authenticated` has none — no auth in this version).
+
+| Policy | Command | Role | Using | With check |
+|--------|---------|------|-------|-----------|
+| `ecovadis_submissions_anon_insert` | INSERT | `anon` | — | `true` |
+| `ecovadis_submissions_service_all` | ALL | `service_role` | `true` | `true` |
+
+Verified this session as the `anon` role:
+
+| Action as `anon` | Result |
+|------------------|--------|
+| `insert` (valid row) | succeeds ✓ (trigger assigned a `TCS-2026-NNNN` id) |
+| `select` / `update` / `delete` | no table privilege — denied ✓ |
+
+The Supabase security advisor reports **no new findings** for this table (RLS enabled +
+policies present). Pre-existing advisories are unchanged: `submission_counters`
+(`rls_enabled_no_policy`, intentional) and `public.rls_auto_enable()` (the pre-existing
+event-trigger function — owner's discretion, see below).
+
 ## Environment variables (set in Netlify, never in code)
 
 | Variable | Purpose |
@@ -135,5 +198,5 @@ discretion since it is outside this tool's schema.
 ## Deletion (GDPR)
 
 No self-service deletion. A supplier emails `sustainability@thecorporate.com`; The
-Corporate's team deletes the corresponding `submissions` row in the Supabase
-dashboard (service role bypasses RLS).
+Corporate's team deletes the corresponding row from `submissions` or
+`ecovadis_submissions` in the Supabase dashboard (service role bypasses RLS).

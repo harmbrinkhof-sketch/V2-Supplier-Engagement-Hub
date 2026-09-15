@@ -1548,7 +1548,7 @@
           <br><br>
           Estimated time: <strong style="color:var(--tc-ink); font-weight:500;">5 minutes</strong>
         </div>
-        <button type="button" class="tc-btn-primary" style="width:100%; text-align:center; display:block; padding:14px;" onclick="window.open('https://ecovadis.com', '_blank', 'noopener,noreferrer')">
+        <button type="button" class="tc-btn-primary" style="width:100%; text-align:center; display:block; padding:14px;" onclick="showEcoVadis()">
           Submit EcoVadis Scorecard
         </button>
       </div>
@@ -1558,10 +1558,10 @@
         <div class="tree-path-badge badge-b"><span>Path B — Full Assessment</span></div>
         <div class="tree-path-title">Complete the Questionnaire</div>
         <div class="tree-path-body">
-          Complete the ESRS-aligned questionnaire covering 7 sections mapped to
+          Complete the ESRS-aligned questionnaire covering 6 sections (S2–S7) mapped to
           ESRS E1, E2, E3, E4, E5, S2, and G1. Fill it in section by section inside
           the portal, or download it, complete it offline, and upload it back — then
-          submit directly here. No email required.
+          submit directly here. You receive a confirmation email once submitted.
           <br><br>
           Estimated time: <strong style="color:var(--tc-ink); font-weight:500;">45–60 minutes</strong>
         </div>
@@ -1738,6 +1738,75 @@
   </div>
 </div>
 
+<!-- ══ VIEW: ECOVADIS — CONTACT & SCORECARD CAPTURE (v3.2) ═══════════════════ -->
+<div id="view-ecovadis" class="view flow" hidden>
+  <div class="flow-wrap">
+    <button type="button" class="flow-back" onclick="goHome()">
+      <svg viewBox="0 0 24 24"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+      Back to portal
+    </button>
+    <p class="flow-eyebrow">EcoVadis — Your details</p>
+    <h1 class="flow-title">Submit your EcoVadis Scorecard</h1>
+    <p class="flow-intro">
+      We need your company and contact details, and a link to your current EcoVadis Scorecard,
+      before we send you across to EcoVadis. This takes about two minutes.
+    </p>
+    <form id="ecovadis-form" class="form-section" novalidate autocomplete="off">
+      <div class="contact-grid">
+        <div class="field field-full">
+          <label class="field-label" for="ev-company">Company name <span class="field-req">(required)</span></label>
+          <input type="text" class="field-input" id="ev-company" autocomplete="organization">
+        </div>
+        <div class="field">
+          <label class="field-label" for="ev-name">Contact full name <span class="field-req">(required)</span></label>
+          <input type="text" class="field-input" id="ev-name" autocomplete="name">
+        </div>
+        <div class="field">
+          <label class="field-label" for="ev-job">Job title <span class="field-req">(required)</span></label>
+          <input type="text" class="field-input" id="ev-job" autocomplete="organization-title">
+        </div>
+        <div class="field">
+          <label class="field-label" for="ev-email">Contact email <span class="field-req">(required)</span></label>
+          <input type="email" class="field-input" id="ev-email" autocomplete="email" inputmode="email">
+        </div>
+        <div class="field">
+          <label class="field-label" for="ev-phone">Contact phone <span class="field-req">(required)</span></label>
+          <input type="tel" class="field-input" id="ev-phone" autocomplete="tel" inputmode="tel">
+        </div>
+        <div class="field">
+          <label class="field-label" for="ev-department">Department <span class="field-req">(required)</span></label>
+          <input type="text" class="field-input" id="ev-department" autocomplete="organization">
+        </div>
+        <div class="field field-full">
+          <label class="field-label" for="ev-link">EcoVadis Scorecard Link <span class="field-req">(required)</span></label>
+          <div class="field-help">Paste the full URL of your current scorecard, issued within the last 12 months.</div>
+          <input type="url" class="field-input" id="ev-link" inputmode="url" placeholder="https://">
+        </div>
+      </div>
+      <div class="tc-divider"></div>
+      <div class="consent">
+        <div class="consent-label">Data &amp; Privacy</div>
+        <p class="consent-statement">
+          Your data will be stored securely and used only to process and review your company's
+          sustainability assessment submission for The Corporate's supplier program. You can
+          request deletion at any time by contacting
+          <a href="mailto:sustainability@thecorporate.com?subject=Data deletion request">sustainability@thecorporate.com</a>.
+        </p>
+        <label class="check-row">
+          <input type="checkbox" class="tc-check" id="ev-consent">
+          <span class="consent-text">I have read the statement above and consent to The Corporate storing and processing these details.</span>
+        </label>
+      </div>
+      <div id="ecovadis-alert" class="form-alert" role="alert"></div>
+      <div class="flow-actions">
+        <button type="button" class="tc-btn-ghost" onclick="goHome()">Back</button>
+        <span class="spacer"></span>
+        <button type="button" class="tc-btn-primary" id="ev-submit" disabled>Submit &amp; Continue to EcoVadis</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <!-- ══ VIEW: CONTACT STEP (shared — opening step of both doors) ══════════════ -->
 <div id="view-contact" class="view flow" hidden>
   <div class="flow-wrap">
@@ -1773,18 +1842,23 @@
           <label class="field-label" for="c-phone">Contact phone <span class="field-req">(required)</span></label>
           <input type="tel" class="field-input" id="c-phone" autocomplete="tel" inputmode="tel">
         </div>
+        <div class="field">
+          <label class="field-label" for="c-department">Department <span class="field-req">(required)</span></label>
+          <input type="text" class="field-input" id="c-department" autocomplete="organization">
+        </div>
       </div>
       <div class="tc-divider"></div>
       <div class="consent">
         <div class="consent-label">Data &amp; Privacy</div>
         <p class="consent-statement">
-          Your data will be stored securely and used only to process your sustainability
-          assessment submission. You can request deletion at any time by contacting
-          <a href="mailto:sustainability@thecorporate.com?subject=Supplier Portal Help Desk Query">sustainability@thecorporate.com</a>.
+          Your data will be stored securely and used only to process and review your company's
+          sustainability assessment submission for The Corporate's supplier program. You can
+          request deletion at any time by contacting
+          <a href="mailto:sustainability@thecorporate.com?subject=Data deletion request">sustainability@thecorporate.com</a>.
         </p>
         <label class="check-row">
           <input type="checkbox" class="tc-check" id="c-consent">
-          <span class="consent-text">I have read and consent to the above.</span>
+          <span class="consent-text">I have read the statement above and consent to The Corporate storing and processing these details.</span>
         </label>
       </div>
       <div id="contact-alert" class="form-alert" role="alert"></div>
