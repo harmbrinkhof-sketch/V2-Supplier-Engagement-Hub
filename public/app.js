@@ -1,6 +1,6 @@
 /* ─────────────────────────────────────────────────────────────────────────
    The Corporate — Supplier Sustainability Portal 2026
-   Questionnaire flow logic (v3.1)
+   Questionnaire flow logic (v3.2)
 
    Flow (both doors):
      Door Picker → Contact Step → [questionnaire] → Declaration → Review → Submit
@@ -9,6 +9,12 @@
      Submit → write to Supabase `submissions` (direct browser insert, insert-only
      anon key served at runtime by the /config Netlify Function) → fire a
      confirmation email (Netlify Function, independent of the write) → Confirmation.
+
+   EcoVadis path (v3.2): Landing "Submit EcoVadis Scorecard" → EcoVadis Contact &
+   Scorecard intake (6 contact fields + scorecard link + GDPR consent) → Submit →
+   write to Supabase `ecovadis_submissions` (same insert-only anon key, shared
+   tracking_id sequence) → fire the same confirmation email → open ecovadis.com in
+   a new tab. No confirmation screen on the portal itself.
 
    No API key, URL, or secret is hardcoded here. The public Supabase URL + anon
    key are fetched at runtime from /.netlify/functions/config.
@@ -93,22 +99,40 @@
   var EXPECTED_HEADERS = ["section", "esrs ref", "type", "question metric", "supplier response", "notes evidence", "status"];
   var DECLARATION_MATCH = "declaration i confirm that the information provided";
 
+  // Shared Contact Step (Door 1 + Door 2). Department (v3.2) is now required on
+  // all three paths.
   var CONTACT_FIELDS = [
-    { key: "company_name",     id: "c-company", label: "Company name" },
-    { key: "contact_name",     id: "c-name",    label: "Contact name" },
-    { key: "contact_job_title",id: "c-job",     label: "Job title / role" },
-    { key: "contact_email",    id: "c-email",   label: "Contact email" },
-    { key: "contact_phone",    id: "c-phone",   label: "Contact phone" }
+    { key: "company_name",     id: "c-company",    label: "Company name" },
+    { key: "contact_name",     id: "c-name",       label: "Contact name" },
+    { key: "contact_job_title",id: "c-job",        label: "Job title / role" },
+    { key: "contact_email",    id: "c-email",      label: "Contact email" },
+    { key: "contact_phone",    id: "c-phone",      label: "Contact phone" },
+    { key: "department",       id: "c-department", label: "Department" }
+  ];
+  // EcoVadis intake (v3.2) — same six contact fields plus the scorecard link.
+  var ECOVADIS_FIELDS = [
+    { key: "company_name",     id: "ev-company",    label: "Company name" },
+    { key: "contact_name",     id: "ev-name",       label: "Contact full name" },
+    { key: "contact_job_title",id: "ev-job",        label: "Job title" },
+    { key: "contact_email",    id: "ev-email",      label: "Contact email" },
+    { key: "contact_phone",    id: "ev-phone",      label: "Contact phone" },
+    { key: "department",       id: "ev-department", label: "Department" },
+    { key: "ecovadis_link",    id: "ev-link",       label: "EcoVadis Scorecard Link" }
   ];
   var EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  function validUrl(v) {
+    try { var u = new URL(String(v).trim()); return u.protocol === "http:" || u.protocol === "https:"; }
+    catch (e) { return false; }
+  }
 
   /* ── State (session only; in-progress data never persisted until Submit) ─── */
   var state = {
     door: null,
     section: 0,
     answers: {},
-    contact: { company_name: "", contact_name: "", contact_job_title: "", contact_email: "", contact_phone: "", consent: false },
-    declaration: { signatory: "", confirmed: false }
+    contact: { company_name: "", contact_name: "", contact_job_title: "", contact_email: "", contact_phone: "", department: "", consent: false },
+    declaration: { signatory: "", confirmed: false },
+    ecovadis: { company_name: "", contact_name: "", contact_job_title: "", contact_email: "", contact_phone: "", department: "", ecovadis_link: "", consent: false }
   };
 
   function allQuestions() {
@@ -136,8 +160,8 @@
   function hideFormAlert(id) { var a = el(id); if (a) { a.classList.remove("is-visible"); a.textContent = ""; } }
 
   /* ── View switching ─────────────────────────────────────────────────────── */
-  var VIEWS = ["view-landing", "view-doorpicker", "view-contact", "view-door1",
-               "view-declaration", "view-door1review", "view-door2",
+  var VIEWS = ["view-landing", "view-ecovadis", "view-doorpicker", "view-contact",
+               "view-door1", "view-declaration", "view-door1review", "view-door2",
                "view-door2review", "view-confirm"];
   function showView(id) {
     VIEWS.forEach(function (v) {
@@ -179,7 +203,8 @@
   function contactComplete() {
     var c = state.contact;
     return !!(c.company_name && c.contact_name && c.contact_job_title &&
-              c.contact_email && EMAIL_RE.test(c.contact_email) && c.contact_phone && c.consent);
+              c.contact_email && EMAIL_RE.test(c.contact_email) && c.contact_phone &&
+              c.department && c.consent);
   }
   function updateContactContinue() {
     readContactForm();
@@ -195,6 +220,84 @@
     hideFormAlert("contact-alert");
     if (state.door === 1) { openDoor1(0); }
     else { showView("view-door2"); }
+  }
+
+  /* ── EcoVadis Contact & Scorecard intake (v3.2, its own path) ───────────── */
+  function showEcoVadis() {
+    ECOVADIS_FIELDS.forEach(function (f) { var n = el(f.id); if (n) n.value = state.ecovadis[f.key]; });
+    var cb = el("ev-consent"); if (cb) cb.checked = !!state.ecovadis.consent;
+    hideFormAlert("ecovadis-alert");
+    updateEcoVadisSubmit();
+    showView("view-ecovadis");
+  }
+  window.showEcoVadis = showEcoVadis;
+
+  function readEcoVadisForm() {
+    ECOVADIS_FIELDS.forEach(function (f) { state.ecovadis[f.key] = val(f.id); });
+    state.ecovadis.consent = !!(el("ev-consent") && el("ev-consent").checked);
+  }
+  function ecovadisComplete() {
+    var e = state.ecovadis;
+    return !!(e.company_name && e.contact_name && e.contact_job_title &&
+              e.contact_email && EMAIL_RE.test(e.contact_email) && e.contact_phone &&
+              e.department && e.ecovadis_link && validUrl(e.ecovadis_link) && e.consent);
+  }
+  function updateEcoVadisSubmit() {
+    readEcoVadisForm();
+    var btn = el("ev-submit");
+    if (btn) btn.disabled = !ecovadisComplete();
+  }
+  function buildEcoRow() {
+    var e = state.ecovadis;
+    return {
+      company_name: e.company_name,
+      contact_name: e.contact_name,
+      contact_email: e.contact_email,
+      contact_phone: e.contact_phone,
+      contact_job_title: e.contact_job_title,
+      department: e.department,
+      ecovadis_link: e.ecovadis_link
+    };
+  }
+  function setEcoSubmitting(on) {
+    var btn = el("ev-submit");
+    if (!btn) return;
+    btn.disabled = on;
+    btn.textContent = on ? "Submitting…" : "Submit & Continue to EcoVadis";
+  }
+  function resetEcoVadis() {
+    state.ecovadis = { company_name: "", contact_name: "", contact_job_title: "", contact_email: "", contact_phone: "", department: "", ecovadis_link: "", consent: false };
+    ECOVADIS_FIELDS.forEach(function (f) { var n = el(f.id); if (n) n.value = ""; });
+    var cb = el("ev-consent"); if (cb) cb.checked = false;
+    setEcoSubmitting(false);
+  }
+  function submitEcoVadis() {
+    readEcoVadisForm();
+    hideFormAlert("ecovadis-alert");
+    if (!ecovadisComplete()) {
+      showFormAlert("ecovadis-alert", "Please complete all fields with a valid email and scorecard URL, and tick the consent box.");
+      return;
+    }
+    // Open the destination tab now, inside the click gesture, so the popup blocker
+    // does not block it after the async write. Keep the handle (no "noopener" in the
+    // feature string) to navigate it once the write lands, then sever the opener.
+    var win = window.open("about:blank", "_blank");
+    if (win) { try { win.opener = null; } catch (e) {} }
+
+    var row = buildEcoRow();
+    setEcoSubmitting(true);
+    insertRow("ecovadis_submissions", row).then(function () {
+      sendConfirmationEmail(row);          // independent of the write (fire-and-forget)
+      if (win) { win.location = "https://ecovadis.com"; }
+      else { window.open("https://ecovadis.com", "_blank", "noopener,noreferrer"); }
+      resetEcoVadis();
+      showView("view-landing");            // no confirmation screen on the portal itself
+    }).catch(function (err) {
+      if (win) { try { win.close(); } catch (e) {} }
+      setEcoSubmitting(false);
+      showFormAlert("ecovadis-alert", "We could not save your details just now. Please check your connection and try again. Your details are still here.");
+      if (window.console) console.error("EcoVadis submission failed:", err);
+    });
   }
 
   /* ── DOOR 1 — guided stepper ────────────────────────────────────────────── */
@@ -370,6 +473,7 @@
       { label: "Job title / role", value: c.contact_job_title },
       { label: "Contact email", value: c.contact_email },
       { label: "Contact phone", value: c.contact_phone },
+      { label: "Department", value: c.department },
       { label: "GDPR consent", value: c.consent ? "Consent given" : "" }
     ]);
   }
@@ -548,6 +652,7 @@
       contact_email: c.contact_email,
       contact_phone: c.contact_phone,
       contact_job_title: c.contact_job_title,
+      department: c.department,
       submission_door: door === 1 ? "Door 1" : "Door 2",
       questionnaire_answers: answers,
       authorised_signatory_name: state.declaration.signatory,
@@ -555,10 +660,13 @@
     };
   }
 
-  function insertSubmission(row) {
+  // Direct PostgREST insert with the insert-only anon key. `Prefer: return=minimal`
+  // because anon has no read policy — we never read the row back. Used by both the
+  // `submissions` and `ecovadis_submissions` writes.
+  function insertRow(table, row) {
     return getConfig().then(function (cfg) {
       var base = cfg.url.replace(/\/+$/, "");
-      return fetch(base + "/rest/v1/submissions", {
+      return fetch(base + "/rest/v1/" + table, {
         method: "POST",
         headers: {
           "apikey": cfg.anonKey,
@@ -575,6 +683,7 @@
       });
     });
   }
+  function insertSubmission(row) { return insertRow("submissions", row); }
 
   // Fire-and-forget. The confirmation email is independent of the write: a failure
   // here must never block or roll back the submission.
@@ -642,6 +751,16 @@
     var contactContinueBtn = el("contact-continue");
     if (contactContinueBtn) contactContinueBtn.addEventListener("click", contactContinue);
 
+    // EcoVadis intake live validation
+    ECOVADIS_FIELDS.forEach(function (f) {
+      var n = el(f.id);
+      if (n) { n.addEventListener("input", updateEcoVadisSubmit); n.addEventListener("change", updateEcoVadisSubmit); }
+    });
+    var evConsent = el("ev-consent");
+    if (evConsent) evConsent.addEventListener("change", updateEcoVadisSubmit);
+    var evSubmitBtn = el("ev-submit");
+    if (evSubmitBtn) evSubmitBtn.addEventListener("click", submitEcoVadis);
+
     // Declaration Step live validation
     var declName = el("decl-name"), declConfirm = el("decl-confirm");
     if (declName) declName.addEventListener("input", updateDeclarationContinue);
@@ -680,9 +799,12 @@
   window.__TC_TEST__ = {
     validateAndParse: validateAndParse,
     norm: norm,
+    validUrl: validUrl,
     getState: function () { return state; },
     contactComplete: contactComplete,
     declarationComplete: declarationComplete,
-    buildRow: buildRow
+    ecovadisComplete: ecovadisComplete,
+    buildRow: buildRow,
+    buildEcoRow: buildEcoRow
   };
 })();
